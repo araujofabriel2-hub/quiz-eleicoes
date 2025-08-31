@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiz Eleições</title>
+<style>
+body { font-family: Arial, sans-serif; padding: 20px; }
+.quiz { max-width: 600px; margin: auto; }
+.question { font-size: 20px; margin: 20px 0 10px; }
+.option { display: block; margin: 5px 0; padding: 10px; border: 1px solid #ccc; cursor: pointer; border-radius: 8px; }
+.option:hover { background: #f0f0f0; }
+.option.disabled { pointer-events: none; opacity: 0.6; background: #eee; }
+#results { margin-top: 40px; }
+hr { margin: 20px 0; }
+</style>
+</head>
+<body>
+<div class="quiz">
+  <h1>Quiz sobre Eleições</h1>
+  <div id="quiz-container"></div>
+  <div id="results"></div>
+</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
+<script>
+// 🔹 Configuração do Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyDX84XCGCOuEwJW2UhEXDh77aDVRJ0GxpQ",
+  authDomain: "quiz-eleicoes.firebaseapp.com",
+  databaseURL: "https://quiz-eleicoes-default-rtdb.firebaseio.com",
+  projectId: "quiz-eleicoes",
+  storageBucket: "quiz-eleicoes.firebasestorage.app",
+  messagingSenderId: "681152120442",
+  appId: "1:681152120442:web:b96e1bf219b2386a1f1dc3"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// 🔹 Perguntas do quiz
+const perguntas = [
+  { enunciado: "Você acredita que adolescentes de 16 e 17 anos estão aptos a votar?", opcoes: ["Sim", "Nao", "Nao sabe", "Nao respondeu"] },
+  { enunciado: "Pretende votar nas próximas eleições?", opcoes: ["Sim", "Nao", "Nao sabe", "Nao respondeu"] },
+  { enunciado: "Se você não pretende votar nas próximas eleições, qual é o motivo?", opcoes: ["Falta de interesse", "Falta de tempo", "Desconhecimento dos candidatos", "Outro"] },
+  { enunciado: "Você confia no sistema eletrônico de votação (urnas eletrônicas)?", opcoes: ["Sim", "Nao", "Nao sabe", "Nao respondeu"] },
+  { enunciado: "Você acha importante o voto ser obrigatório no Brasil?", opcoes: ["Sim", "Nao", "Nao sabe", "Nao respondeu"] },
+  { enunciado: "Você já deixou de votar em alguma eleição?", opcoes: ["Sim", "Nao"] },
+  { enunciado: "Você acredita que seu voto faz diferença no resultado das eleições?", opcoes: ["Sim", "Nao", "Nao sabe", "Nao respondeu"] },
+  { enunciado: "Você se considera bem informado sobre política?", opcoes: ["Sim", "Nao", "Mais ou menos"] },
+  { enunciado: "Com que frequência você acompanha notícias sobre política?", opcoes: ["Todos os dias", "Algumas vezes na semana", "Raramente", "Nunca"] },
+  { enunciado: "Qual o principal meio pelo qual você se informa sobre política?", opcoes: ["TV", "Rádio", "Internet / Redes sociais", "Jornais impressos", "Outro"] },
+  { enunciado: "Você acha que debates entre candidatos influenciam seu voto?", opcoes: ["Sim", "Nao", "Pouco", "Nao sabe"] },
+  { enunciado: "Você costuma pesquisar propostas dos candidatos antes de votar?", opcoes: ["Sim", "Nao", "Às vezes"] },
+  { enunciado: "Você acredita que os políticos cumprem suas promessas de campanha?", opcoes: ["Sim", "Nao", "Raramente", "Nao sabe"] },
+  { enunciado: "Você já mudou seu voto durante a campanha por causa de notícias ou debates?", opcoes: ["Sim", "Nao"] },
+  { enunciado: "O que mais influencia sua decisão de voto?", opcoes: ["Propostas", "Histórico do candidato", "Opinião de familiares/amigos", "Mídia", "Outro"] },
+  { enunciado: "Você acredita que deveria haver limite de mandatos para todos os cargos políticos?", opcoes: ["Sim", "Nao", "Nao sabe"] },
+  { enunciado: "Você acha que deveria haver mais incentivo para candidaturas de jovens?", opcoes: ["Sim", "Nao", "Nao sabe"] },
+  { enunciado: "Você acha que deveria haver mais incentivo para candidaturas femininas?", opcoes: ["Sim", "Nao", "Nao sabe"] },
+  { enunciado: "Você acha que o financiamento público de campanhas é uma boa medida?", opcoes: ["Sim", "Nao", "Nao sabe"] },
+  { enunciado: "Você acredita que o voto pela internet deveria ser implantado no Brasil?", opcoes: ["Sim", "Nao", "Nao sabe"] }
+];
+
+// 🔹 Controle de votos
+let respostasDadas = 0;
+
+// 🔹 Renderizar quiz
+function mostrarQuiz() {
+  const container = document.getElementById("quiz-container");
+  container.innerHTML = "";
+  perguntas.forEach((p,i)=>{
+    let html = `<div class="question">${i+1}. ${p.enunciado}</div>`;
+    p.opcoes.forEach(op=>{
+      html += `<div class="option" id="q${i}-${op}" onclick="votar(${i}, '${op}')">${op}</div>`;
+    });
+    container.innerHTML += html + "<hr>";
+  });
+}
+
+// 🔹 Função votar
+function votar(numPergunta, opcao){
+  const ref = db.ref("quiz/"+numPergunta+"/"+opcao);
+  ref.transaction(v => (v||0)+1 );
+
+  const opcoesDiv = document.querySelectorAll(`[id^=q${numPergunta}-]`);
+  opcoesDiv.forEach(div=> div.classList.add("disabled")); // desabilita só temporariamente
+  respostasDadas++;
+  if(respostasDadas === perguntas.length){
+    mostrarResultados();
+  }
+}
+
+// 🔹 Mostrar resultados em tempo real
+function mostrarResultados(){
+  const resultsDiv = document.getElementById("results");
+  resultsDiv.innerHTML = "<h2>Resultados:</h2>";
+
+  perguntas.forEach((p,i)=>{
+    const ref = db.ref("quiz/"+i);
+    ref.on("value", snap=>{
+      const dados = snap.val() || {};
+      let bloco = `<b>${i+1}. ${p.enunciado}</b><br>`;
+      p.opcoes.forEach(op=>{
+        bloco += `${op}: ${dados[op]||0} votos<br>`;
+      });
+      bloco += "<br>";
+
+      const old = document.getElementById("res-"+i);
+      if(old){
+        old.innerHTML = bloco;
+      } else {
+        const div = document.createElement("div");
+        div.id = "res-"+i;
+        div.innerHTML = bloco;
+        resultsDiv.appendChild(div);
+      }
+    });
+  });
+}
+
+mostrarQuiz();
+</script>
+</body>
+</html>
